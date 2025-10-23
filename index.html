@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ja" data-theme="auto">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>オンライン・ストップウォッチ</title>
+		<meta name="description" content="シンプルで高精度なWebストップウォッチ。ラップ計測とショートカット対応。" />
+		<style>
+			:root{
+				--bg: #0b0c10;
+				--panel: #11131a;
+				--text: #e8ecf1;
+				--muted: #aab4c0;
+				--primary: #3b82f6;
+				--primary-600:#2563eb;
+				--accent: #10b981;
+				--danger: #ef4444;
+				--ring: rgba(59,130,246,0.5);
+				--shadow: 0 10px 30px rgba(0,0,0,0.35);
+				--mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+				--sans: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+			}
+			@media (prefers-color-scheme: light){
+				html[data-theme="auto"]{
+					--bg: #f6f7fb;
+					--panel: #ffffff;
+					--text: #0b1020;
+					--muted: #596579;
+					--primary: #2563eb;
+					--primary-600:#1d4ed8;
+					--accent: #059669;
+					--danger: #dc2626;
+					--ring: rgba(37,99,235,0.35);
+					--shadow: 0 10px 30px rgba(0,0,0,0.10);
+				}
+			}
+			html[data-theme="light"]{
+				--bg: #f6f7fb;
+				--panel: #ffffff;
+				--text: #0b1020;
+				--muted: #596579;
+				--primary: #2563eb;
+				--primary-600:#1d4ed8;
+				--accent: #059669;
+				--danger: #dc2626;
+				--ring: rgba(37,99,235,0.35);
+				--shadow: 0 10px 30px rgba(0,0,0,0.10);
+			}
+
+			*{box-sizing:border-box}
+			html,body{height:100%}
+			body{
+				margin:0;
+				background: var(--bg);
+				color: var(--text);
+				font-family: var(--sans);
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+				display:flex;
+				align-items:center;
+				justify-content:center;
+				padding: 24px;
+			}
+			.app{
+				width:min(960px, 100%);
+				display:grid;
+				gap:16px;
+			}
+			.panel{
+				background: var(--panel);
+				border-radius:16px;
+				box-shadow: var(--shadow);
+				padding: clamp(16px, 2.5vw, 28px);
+			}
+			header{
+				display:flex;
+				align-items:center;
+				justify-content:space-between;
+				gap:12px;
+			}
+			h1{
+				margin:0;
+				font-size: clamp(18px, 1.6vw, 22px);
+				letter-spacing: .04em;
+			}
+			.theme-toggle{
+				display:inline-flex;align-items:center;gap:8px;
+				background:transparent;border:1px solid color-mix(in oklab, var(--muted) 35%, transparent);
+				color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer;
+			}
+			.theme-toggle:hover{background-color: color-mix(in oklab, var(--muted) 8%, transparent)}
+			.theme-toggle:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+
+			.display{
+				display:flex;flex-direction:column;align-items:center;gap:14px;
+			}
+			.time{
+				font-family: var(--mono);
+				font-variant-numeric: tabular-nums lining-nums;
+				letter-spacing: 0.04em;
+				font-weight:700;
+				line-height:1.1;
+				font-size: clamp(40px, 10vw, 120px);
+			}
+			.status{color: var(--muted);font-size: 14px}
+
+			.controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+			.btn{appearance:none;border:0;border-radius:999px;padding:12px 18px;font-weight:600;cursor:pointer;transition:transform .02s ease, background .2s ease, box-shadow .2s ease}
+			.btn:active{transform:translateY(1px)}
+			.btn:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+			.btn-primary{background:var(--primary);color:white}
+			.btn-primary:hover{background:var(--primary-600)}
+			.btn-accent{background:var(--accent);color:white}
+			.btn-muted{background:color-mix(in oklab, var(--muted) 25%, transparent);color:var(--text);border:1px solid color-mix(in oklab, var(--muted) 35%, transparent)}
+			.btn-danger{background:var(--danger);color:white}
+			.btn[disabled]{opacity:.5;cursor:not-allowed}
+
+			.laps{
+				display:flex;flex-direction:column;gap:10px;max-height:min(50vh, 420px);overflow:auto;border-radius:12px;border:1px solid color-mix(in oklab, var(--muted) 25%, transparent)
+			}
+			.lap-head, .lap-row{
+				display:grid;grid-template-columns: 72px 1fr 1fr 1fr;gap:12px;align-items:center;padding:10px 12px;
+			}
+			.lap-head{position:sticky;top:0;background:color-mix(in oklab, var(--panel) 90%, black);border-bottom:1px solid color-mix(in oklab, var(--muted) 25%, transparent);font-weight:700}
+			.lap-row:nth-child(even){background: color-mix(in oklab, var(--panel) 95%, black)}
+			.lap-num{opacity:.9}
+			.lap-time, .lap-split, .lap-total{font-family: var(--mono);font-variant-numeric: tabular-nums lining-nums}
+			.lap-actions{display:flex;gap:6px}
+			.icon-btn{background:transparent;border:1px solid color-mix(in oklab, var(--muted) 35%, transparent);padding:6px 8px;border-radius:8px;color:var(--text);cursor:pointer}
+			.icon-btn:hover{background:color-mix(in oklab, var(--muted) 8%, transparent)}
+
+			.hint{color:var(--muted);font-size:13px}
+			.visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+			@media (max-width: 520px){
+				.lap-head, .lap-row{grid-template-columns:56px 1fr 1fr 1fr}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="app">
+			<div class="panel">
+				<header>
+					<h1>オンライン・ストップウォッチ</h1>
+					<button id="themeToggle" class="theme-toggle" aria-label="テーマの切り替え"><span id="themeIcon" aria-hidden="true">🌓</span><span class="visually-hidden">テーマ切替</span></button>
+				</header>
+				<main class="display" aria-live="off">
+					<div id="time" class="time" role="timer" aria-atomic="true">00:00:00.000</div>
+					<div class="status"><span id="statusText">停止中</span></div>
+					<div class="controls">
+						<button id="startPause" class="btn btn-primary">開始</button>
+						<button id="lapBtn" class="btn btn-accent" disabled>ラップ</button>
+						<button id="resetBtn" class="btn btn-muted">リセット</button>
+						<button id="clearLapsBtn" class="btn btn-muted" title="ラップをすべて削除">ラップ消去</button>
+					</div>
+					<p class="hint">ショートカット: Space=開始/停止, L=ラップ, R=リセット, Esc=ラップ消去</p>
+				</main>
+			</div>
+
+			<div class="panel">
+				<div class="laps" id="laps">
+					<div class="lap-head" role="row">
+						<div>#</div>
+						<div>ラップ</div>
+						<div>区間</div>
+						<div>累計</div>
+					</div>
+					<!-- rows -->
+				</div>
+			</div>
+		</div>
+
+		<div id="srAnnounce" class="visually-hidden" aria-live="polite"></div>
+
+		<script>
+			(()=>{
+				const $ = (sel) => document.querySelector(sel);
+				const timeEl = $('#time');
+				const statusText = $('#statusText');
+				const startPauseBtn = $('#startPause');
+				const lapBtn = $('#lapBtn');
+				const resetBtn = $('#resetBtn');
+				const clearLapsBtn = $('#clearLapsBtn');
+				const lapsContainer = $('#laps');
+				const themeToggle = $('#themeToggle');
+				const themeIcon = $('#themeIcon');
+				const srAnnounce = $('#srAnnounce');
+
+				const state = {
+					running: false,
+					startTime: 0, // performance.now()
+					elapsedBefore: 0, // ms
+					laps: [] // { id, splitMs, lapMs, totalMs }
+				};
+
+				let rafId = null;
+
+				// Theme
+				const THEME_KEY = 'stopwatch.theme';
+				function applyStoredTheme(){
+					const saved = localStorage.getItem(THEME_KEY);
+					if(saved === 'light' || saved === 'dark'){
+						document.documentElement.setAttribute('data-theme', saved);
+					} else {
+						document.documentElement.setAttribute('data-theme', 'auto');
+					}
+					updateThemeIcon();
+				}
+				function toggleTheme(){
+					const html = document.documentElement;
+					const cur = html.getAttribute('data-theme') || 'auto';
+					const next = cur === 'dark' ? 'light' : cur === 'light' ? 'auto' : 'dark';
+					html.setAttribute('data-theme', next);
+					localStorage.setItem(THEME_KEY, next);
+					updateThemeIcon();
+				}
+				function updateThemeIcon(){
+					const cur = document.documentElement.getAttribute('data-theme');
+					themeIcon.textContent = cur === 'dark' ? '🌙' : cur === 'light' ? '☀️' : '🌓';
+				}
+
+				// Time formatting
+				function pad(num, len=2){
+					return String(num).padStart(len, '0');
+				}
+				function formatMs(ms){
+					const total = Math.max(0, Math.floor(ms));
+					const hours = Math.floor(total / 3600000);
+					const minutes = Math.floor((total % 3600000) / 60000);
+					const seconds = Math.floor((total % 60000) / 1000);
+					const millis = total % 1000;
+					return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}.${pad(millis,3)}`;
+				}
+
+				function now(){ return performance.now(); }
+				function currentElapsed(){
+					if(!state.running) return state.elapsedBefore;
+					return state.elapsedBefore + (now() - state.startTime);
+				}
+
+				function renderTime(){
+					timeEl.textContent = formatMs(currentElapsed());
+				}
+				function renderStatus(){
+					statusText.textContent = state.running ? '計測中' : '停止中';
+					startPauseBtn.textContent = state.running ? '一時停止' : '開始';
+					lapBtn.disabled = !state.running;
+				}
+				function tick(){
+					if(state.running){
+						renderTime();
+						rafId = requestAnimationFrame(tick);
+					} else {
+						rafId = null;
+					}
+				}
+
+				function start(){
+					if(state.running) return;
+					state.startTime = now();
+					state.running = true;
+					renderStatus();
+					tick();
+				}
+				function pause(){
+					if(!state.running) return;
+					state.elapsedBefore += now() - state.startTime;
+					state.running = false;
+					renderStatus();
+					renderTime();
+				}
+				function reset(){
+					const wasRunning = state.running;
+					state.running = false;
+					state.startTime = 0;
+					state.elapsedBefore = 0;
+					if(wasRunning && rafId){ cancelAnimationFrame(rafId); rafId = null; }
+					renderStatus();
+					renderTime();
+				}
+
+				function addLap(){
+					if(!state.running) return;
+					const totalMs = currentElapsed();
+					const prevTotal = state.laps.length ? state.laps[state.laps.length-1].totalMs : 0;
+					const lapMs = totalMs - prevTotal;
+					const splitMs = lapMs; // alias for clarity
+					const id = state.laps.length + 1;
+					state.laps.push({ id, splitMs, lapMs, totalMs });
+					renderLaps();
+					announce(`ラップ ${id}: ${formatMs(lapMs)}、累計 ${formatMs(totalMs)}`);
+				}
+				function removeLap(index){
+					state.laps.splice(index, 1);
+					// 再番号振り直し
+					state.laps.forEach((l, i)=> l.id = i+1);
+					renderLaps();
+				}
+				function clearLaps(confirmNeeded=true){
+					if(confirmNeeded){
+						const ok = confirm('すべてのラップを削除しますか？');
+						if(!ok) return;
+					}
+					state.laps = [];
+					renderLaps();
+				}
+
+				function renderLaps(){
+					// 既存の行を削除（ヘッダ以外）
+					const rows = Array.from(lapsContainer.querySelectorAll('.lap-row'));
+					rows.forEach(r=>r.remove());
+
+					state.laps.forEach((lap, idx)=>{
+						const row = document.createElement('div');
+						row.className = 'lap-row';
+						row.setAttribute('role','row');
+
+						const num = document.createElement('div');
+						num.className = 'lap-num';
+						num.textContent = lap.id;
+
+						const lapTime = document.createElement('div');
+						lapTime.className = 'lap-time';
+						lapTime.textContent = formatMs(lap.lapMs);
+
+						const split = document.createElement('div');
+						split.className = 'lap-split';
+						split.textContent = formatMs(lap.splitMs);
+
+						const total = document.createElement('div');
+						total.className = 'lap-total';
+						total.textContent = formatMs(lap.totalMs);
+
+						row.append(num, lapTime, split, total);
+						lapsContainer.appendChild(row);
+					});
+				}
+
+        
+
+				function announce(msg){
+					srAnnounce.textContent = '';
+					// 次フレームでセットして読み上げさせる
+					requestAnimationFrame(()=>{ srAnnounce.textContent = msg; });
+				}
+
+				// Event bindings
+				startPauseBtn.addEventListener('click', ()=>{
+					state.running ? pause() : start();
+				});
+				lapBtn.addEventListener('click', addLap);
+				resetBtn.addEventListener('click', reset);
+				clearLapsBtn.addEventListener('click', ()=> clearLaps(true));
+				themeToggle.addEventListener('click', toggleTheme);
+
+				window.addEventListener('keydown', (e)=>{
+					const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+					const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || e.isComposing;
+					if(typing) return;
+					if(e.code === 'Space'){ e.preventDefault(); state.running ? pause() : start(); }
+					else if(e.key === 'l' || e.key === 'L'){ if(state.running){ e.preventDefault(); addLap(); } }
+					else if(e.key === 'r' || e.key === 'R'){ e.preventDefault(); reset(); }
+					else if(e.key === 'Escape'){ e.preventDefault(); clearLaps(true); }
+				});
+
+				// Init
+				applyStoredTheme();
+				renderStatus();
+				renderTime();
+				renderLaps();
+			})();
+		</script>
+	</body>
+</html>
